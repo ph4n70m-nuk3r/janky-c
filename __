@@ -1,0 +1,4 @@
+set +x
+set -e
+./_  debug  optimize  analyze  sanitize
+

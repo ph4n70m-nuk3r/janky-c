@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+#################
+## Shell opts. ##
+#################
+## Disable shell debugging; Enable exit on error. ##
+set +x
+set -e
+################
+## Constants. ##
+################
+## Files. ##
+INPUT_FILES=('main.c')
+OUTPUT_FILENAME='a.out'
+## User input validation. ##
+SCRIPT_MAX_ARGS=4
+SCRIPT_DEBUG_ARG='debug'
+SCRIPT_OPTIMIZE_ARG='optimize'
+SCRIPT_ANALYZE_ARG='analyze'
+SCRIPT_SANITIZE_ARG='sanitize'
+## GCC options [common]. ##
+WARN_ARGS=('--extra-warnings' '--pedantic-errors')
+HARDENING_ARGS=('-fPIC' '-fPIE' '-pie' '-fstack-protector-all' '-ftrapv' '-mharden-sls=all')
+OPTIMIZER_ARGS=('-O2')
+SANITIZER_ARGS=('-fsanitize=address,alignment,bool,builtin,enum,vla-bound,leak,object-size,undefined,unreachable,return,integer-divide-by-zero,signed-integer-overflow,float-divide-by-zero,float-cast-overflow,nonnull-attribute,returns-nonnull-attribute,null,pointer-overflow,pointer-compare,pointer-subtract,shift,shift-exponent,shift-base')
+## GCC options [optional]. ##
+DEBUGGER_ARGS=('-ggdb3')
+ANALYZER_ARGS=()
+###############
+## OS Checks ##
+###############
+## Handle differences for Termux (Android - clang 18).
+if command -v termux-setup-storage 1>/dev/null
+    then
+        ## Clang 18 on Termux. ##
+        HARDENING_ARGS+=()
+        OPTIMIZER_ARGS+=()
+        SANITIZER_ARGS+=()
+        ANALYZER_ARGS+=('--analyze' '--analyzer-output' 'text')
+    else
+        ## GCC 11 on Ubuntu. ##
+        HARDENING_ARGS+=('-fcf-protection=full' '-ftrampolines')
+        OPTIMIZER_ARGS+=()
+        SANITIZER_ARGS+=('-fsanitize=bounds-strict')
+        ANALYZER_ARGS+=('-fanalyzer' '-fanalyzer-verbosity=0' '-Wanalyzer-double-fclose' '-Wanalyzer-double-free' '-Wanalyzer-exposure-through-output-file' '-Wanalyzer-file-leak' '-Wanalyzer-free-of-non-heap' '-Wanalyzer-malloc-leak' '-Wanalyzer-mismatching-deallocation' '-Wanalyzer-possible-null-argument' '-Wanalyzer-possible-null-dereference' '-Wanalyzer-null-argument' '-Wanalyzer-null-dereference' '-Wanalyzer-shift-count-negative' '-Wanalyzer-shift-count-overflow' '-Wanalyzer-stale-setjmp-buffer' '-Wanalyzer-tainted-array-index' '-Wanalyzer-unsafe-call-within-signal-handler' '-Wanalyzer-use-after-free' '-Wanalyzer-use-of-pointer-in-stale-stack-frame' '-Wanalyzer-Write-to-const' '-Wanalyzer-write-to-string-literal')
+    fi
+OPTIMIZER_ARGS+=('-flto')
+###############
+## Defaults. ##
+###############
+BUILD_ARGS=()
+BUILD_ARGS+=("${WARN_ARGS[@]}")
+BUILD_ARGS+=("${HARDENING_ARGS[@]}")
+BUILD_ARGS+=("${OPTIMIZER_ARGS[@]}")
+UNKNOWN_ARGS=()
+##################################################
+## Validate input; Set extra args if requested. ##
+##################################################
+## Check number of args. ##
+if [ "${#@}" -gt "${SCRIPT_MAX_ARGS}" ]
+    then
+        ## Too many args provided. ##
+        echo "This program expects 0-${SCRIPT_MAX_ARGS} arguments, you passed ${#@}." 1>&2
+        exit 1
+    fi
+## Validate args if any provided. ##
+if [ "${#@}" -eq '0' ]
+    then
+        ## No args were provided. ##
+        echo "Skipping extra args..."
+    else
+        ## Arg(s) were provided. ##
+        echo "Checking extra args..."
+        ## Check args are valid. ##
+        for ARG in "${@}"
+            do
+                case "${ARG}" in
+                    "${SCRIPT_DEBUG_ARG}")
+                        echo "Setting debug args..."
+                        BUILD_ARGS+=("${DEBUGGER_ARGS[@]}")
+                        ;;
+                    "${SCRIPT_OPTIMIZE_ARG}")
+                        echo "Setting optimizer args..."
+                        BUILD_ARGS+=("${OPTIMIZER_ARGS[@]}")
+                        ;;
+                    "${SCRIPT_ANALYZE_ARG}")
+                        echo "Setting analyzer args..."
+                        BUILD_ARGS+=("${ANALYZER_ARGS[@]}")
+                        ;;
+                    "${SCRIPT_SANITIZE_ARG}")
+                        echo "Setting sanitizer args..."
+                        BUILD_ARGS+=("${SANITIZER_ARGS[@]}")
+                        ;;
+                    *)
+                        UNKNOWN_ARGS+=("${ARG}")
+                        ;;
+                    esac
+            done
+        if [ "${#UNKNOWN_ARGS[@]}" -gt '0' ]
+            then
+                {
+                    printf '%s ' "script: Unknown args:" "'${UNKNOWN_ARGS[@]}'"
+                    printf '\n'
+                } 1>&2
+                exit 2
+            fi
+    fi
+###########
+## Build ##
+###########
+## Run GCC with args. ##
+gcc "${BUILD_ARGS[@]}" -o "${OUTPUT_FILENAME}"  "${INPUT_FILES[@]}"
+###########
+## Done. ##
+###########
+exit 0
+
