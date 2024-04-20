@@ -1,1 +1,1 @@
-find . -maxdepth 1 -executable -name 'a.*' -exec rm {} +
+find . -maxdepth 1 -executable -name 'a.out' -exec rm {} +
