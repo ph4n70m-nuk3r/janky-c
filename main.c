@@ -9,11 +9,15 @@ foo(
 );
 
 int
-main(void)
+main(
+    void
+)
 {
     /* Function Invocation. */
     int i = foo(10);
+
     printf("%d\n", i);
+    return 0;
 }
 
 /* Function Definition. */
